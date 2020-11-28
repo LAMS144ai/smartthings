@@ -17,7 +17,7 @@
  */
 
 metadata {
-	definition(name: "LAMS ZigBee Multi Switch", namespace: "smartthings", author: "SmartThings", ocfDeviceType: "oic.d.switch", mnmn: "SmartThings", vid: "generic-switch") {
+	definition(name: "ZigBee Multi Switch 4 gang default", namespace: "smartthings", author: "SmartThings", ocfDeviceType: "oic.d.switch", mnmn: "SmartThings", vid: "generic-switch") {
 		capability "Actuator"
 		capability "Configuration"
 		capability "Refresh"
