@@ -60,7 +60,7 @@ metadata {
         input type: "paragraph", element: "paragraph", title: "Version", description: version(), displayDuringSetup: false
         input name: "City", type: "text", title:"City or @StationId or geo:lat;long", description:"City to show air quality without spaces or @StationId or geo:lat;long", required: true
         input name: "Token", type: "text", title:"API Token", description:"Token for the aqicn.com API", required: true
-        input name: "Units", type: "enum", title: "System of measuremen", options: ["Metric", "Imperial"], description: "Choose your system of measuremen", required: true
+        input name: "Units", type: "enum", title: "System of measurement", options: ["Metric", "Imperial"], description: "Choose your system of measurement", required: true
     }
 
     simulator {
