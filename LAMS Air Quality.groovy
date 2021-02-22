@@ -1,5 +1,5 @@
 /**
- *  LAMS Air Quality
+ *  LAMS Air Quality Index
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -18,22 +18,21 @@ import java.text.SimpleDateFormat
 import groovy.json.JsonSlurper
 
 metadata {
-    definition(name: "LAMS Air Quality", namespace: "LAMS", author: "LAMS", "vid": "5e1359e5-bca2-3d64-96e4-f1466713f6a0", "mnmn": "SmartThingsCommunity", ocfDeviceType: "x.com.st.d.airqualitysensor") {
-        capability "Air Quality Sensor" 
-        capability "Fine Dust Sensor"
+    definition(name: "LAMS Air Quality Index", namespace: "LAMS", author: "LAMS", "vid": "ee4b5215-6dae-3583-b2b9-9f7e24b6035a", "mnmn": "SmartThingsCommunity", ocfDeviceType: "x.com.st.d.sensor.smoke") {
+        capability "connectprogram52293.aqistate"
+		capability "connectprogram52293.aqi" 
+        capability "connectprogram52293.pm25aqi"
         capability "Temperature Measurement"
         capability "Relative Humidity Measurement"
         capability "Sensor"
-        
         capability "Health Check"
-        capability "Dust Sensor"
-        capability "Carbon Monoxide Measurement"
+        capability "connectprogram52293.pm10aqi"
+        capability "connectprogram52293.coaqi"
         capability "connectprogram52293.ozoneMeasure"
         capability "connectprogram52293.nitrogenDioxideMeasure"
         capability "connectprogram52293.sufurDioxideMeasure"
         capability "connectprogram52293.atmpressure"
         capability "connectprogram52293.windspeed"
-        
         capability "connectprogram52293.station"
         capability "connectprogram52293.upate"
 
@@ -45,7 +44,6 @@ metadata {
         command "setCo"
         command "setPm25"
         command "setPm10"
-
 		command "setUpdate"
         command "setStation"
         command "setAirScore"
@@ -54,12 +52,14 @@ metadata {
         command "setNitrogenDioxide"
         command "setWindSpeed"
         command "setAirPressure"
+        command "setAirState"
     }
 
     preferences {
         input type: "paragraph", element: "paragraph", title: "Version", description: version(), displayDuringSetup: false
         input name: "City", type: "text", title:"City or @StationId or geo:lat;long", description:"City to show air quality without spaces or @StationId or geo:lat;long", required: true
         input name: "Token", type: "text", title:"API Token", description:"Token for the aqicn.com API", required: true
+        input name: "Units", type: "enum", title: "System of measurement", options: ["Metric", "Imperial"], description: "Choose your system of measurement", required: true
     }
 
     simulator {
@@ -90,6 +90,7 @@ def init(){
 
 def updated() {
     log.debug "updated()"
+    refresh()
 }
 
 def refresh() {
@@ -114,7 +115,7 @@ def setWindSpeed(val) {
 
 def setCo(val) {
 	log.debug "set Carbon monoxide to: $val"
-	sendEvent(name:"carbonMonoxideLevel", value: val, displayed: false)
+	sendEvent(name:"coAqiLevel", value: val, displayed: false)
 }
 
 def setAirPressure(val) {
@@ -124,12 +125,12 @@ def setAirPressure(val) {
 
 def setPm25(val) {
 	log.debug "set Fine dust to: $val"
-	sendEvent(name:"fineDustLevel", value: val, displayed: false)
+	sendEvent(name:"pm25AqiLevel", value: val, displayed: false)
 }
 
 def setPm10(val) {
 	log.debug "set Dust to: $val"
-	sendEvent(name:"dustLevel", value: val, displayed: false)
+	sendEvent(name:"pm10AqiLevel", value: val, displayed: false)
 }
 
 def setStation(val) {
@@ -144,7 +145,12 @@ def setUpdate(val) {
 
 def setAirScore(val) {
 	log.debug "set display score to: $val"
-	sendEvent(name:"airQuality", value: val, displayed: false)
+	sendEvent(name:"aqiLevel", value: val, displayed: false)
+}
+
+def setAirState(val) {
+	log.debug "set display score to: $val"
+	sendEvent(name:"aqiState", value: val, displayed: false)
 }
 
 def setOzone(val) {
@@ -168,6 +174,7 @@ def updateData(){
 	def feed = city.toLowerCase()
 //	log.debug feed
     def token = "${Token}"
+    def units = "${Units}"
     def options = HOST + feed + "/?token=" + token
 //	log.debug options
 	httpGet(options) {resp ->
@@ -178,36 +185,63 @@ def updateData(){
     
   try {
    if (result.status == "ok") {
+   sendEvent(name: "DeviceWatch-DeviceStatus", value: "online")
+   
+    if (result.data.aqi == 0) {
+   		sendEvent(name:"aqiState", value: "n/a", displayed: false)
+    }
+    if ((result.data.aqi > 0) && (result.data.aqi < 51)) {
+   		sendEvent(name:"aqiState", value: "Good", displayed: false)
+    }
+    if ((result.data.aqi > 50) && (result.data.aqi < 101)) {
+   		sendEvent(name:"aqiState", value: "Moderate", displayed: false)
+    }
+    if ((result.data.aqi > 100) && (result.data.aqi < 151)) {
+   		sendEvent(name:"aqiState", value: "Unhealthy for Sensitive Groups", displayed: false)
+    }
+    if ((result.data.aqi > 150) && (result.data.aqi < 201)) {
+   		sendEvent(name:"aqiState", value: "Unhealthy", displayed: false)
+    }
+    if ((result.data.aqi > 200) && (result.data.aqi < 301)) {
+   		sendEvent(name:"aqiState", value: "Very Unhealthy", displayed: false)
+    }
+    if (result.data.aqi > 300) {
+   		sendEvent(name:"aqiState", value: "Hazardous", displayed: false)
+    }
 
     if (result.data.containsKey("aqi")) {
-    sendEvent(name: "airQuality", value: result.data.aqi, unit: "AQI", displayed: true)
+    sendEvent(name: "aqiLevel", value: result.data.aqi, unit: "AQI", displayed: true)
   	} else {
-    sendEvent(name: "airQuality", value: "n/a", displayed: true)
+    sendEvent(name: "aqiLevel", value: "0", unit: "n/a", displayed: true)
     }
     if (result.data.iaqi.containsKey("t")) {   
-        sendEvent(name: "temperature", value: result.data.iaqi.t.v, displayed: true)
+        if (units == "Imperial") {
+        	sendEvent(name: "temperature", value: result.data.iaqi.t.v * 1.8 + 32, unit: "°F", displayed: true)
+		} else {        
+        	sendEvent(name: "temperature", value: result.data.iaqi.t.v, unit: "°C", displayed: true)
+        }
     } else {
-    sendEvent(name: "temperature", value: "n/a", displayed: true)
+    sendEvent(name: "temperature", value: "0", unit: "n/a", displayed: true)
     }
     if (result.data.iaqi.containsKey("h")) {
         sendEvent(name: "humidity", value: result.data.iaqi.h.v, displayed: true)
     } else {
-    sendEvent(name: "humidity", value: "n/a", displayed: true)
+    sendEvent(name: "humidity", value: "0", unit: "n/a", displayed: true)
     }
     if (result.data.iaqi.containsKey("pm25")) {
-        sendEvent(name: "fineDustLevel", value: result.data.iaqi.pm25.v, displayed: true)
+        sendEvent(name: "pmpAqiLevel", value: result.data.iaqi.pm25.v, unit: "AQI", displayed: true)
         } else {
-    sendEvent(name: "fineDustLevel", value: "n/a", displayed: true)
+    sendEvent(name: "pmpAqiLevel", value: "0", unit: "n/a", displayed: true)
     }
     if (result.data.iaqi.containsKey("co")) {
-        sendEvent(name: "carbonMonoxideLevel", value: result.data.iaqi.co.v, displayed: true)
+        sendEvent(name: "coAqiLevel", value: result.data.iaqi.co.v, unit: "AQI", displayed: true)
         } else {
-    sendEvent(name: "carbonMonoxideLevel", value: "n/a", displayed: true)
+    sendEvent(name: "coAqiLevel", value: "0", unit: "n/a", displayed: true)
     }
     if (result.data.iaqi.containsKey("pm10")) {
-        sendEvent(name: "dustLevel", value: result.data.iaqi.pm10.v, displayed: true)
+        sendEvent(name: "pmgAqiLevel", value: result.data.iaqi.pm10.v, unit: "AQI", displayed: true)
         } else {
-    sendEvent(name: "dustLevel", value: "n/a", displayed: true)
+    sendEvent(name: "pmgAqiLevel", value: "0", unit: "n/a", displayed: true)
     }
     if (result.data.containsKey("city")) {
         sendEvent(name: "station", value: result.data.city.name, displayed: true)
@@ -222,43 +256,49 @@ def updateData(){
     if (result.data.iaqi.containsKey("o3")) {
         sendEvent(name: "ozoneLevel", value: result.data.iaqi.o3.v, displayed: true)
         } else {
-    sendEvent(name: "ozoneLevel", value: "n/a", displayed: true)
+    sendEvent(name: "ozoneLevel", value: "0", unit: "n/a", displayed: true)
     }
     if (result.data.iaqi.containsKey("so2")) {
         sendEvent(name: "sulfurDioxideLevel", value: result.data.iaqi.so2.v, displayed: true)
         } else {
-    sendEvent(name: "sulfurDioxideLevel", value: "n/a", displayed: true)
+    sendEvent(name: "sulfurDioxideLevel", value: "0", unit: "n/a", displayed: true)
     }
     if (result.data.iaqi.containsKey("no2")) {
         sendEvent(name: "nitrogenDioxideLevel", value: result.data.iaqi.no2.v, displayed: true)
         } else {
-    sendEvent(name: "nitrogenDioxideLevel", value: "n/a", displayed: true)
+    sendEvent(name: "nitrogenDioxideLevel", value: "0", unit: "n/a", displayed: true)
     }
     if (result.data.iaqi.containsKey("p")) {
-        sendEvent(name: "atmPressureLevel", value: result.data.iaqi.p.v, displayed: true)
+        sendEvent(name: "atmPressureLevel", value: result.data.iaqi.p.v, unit: "hPa", displayed: true)
         } else {
-    sendEvent(name: "atmPressureLevel", value: "n/a", displayed: true)
+    sendEvent(name: "atmPressureLevel", value: "0", unit: "n/a", displayed: true)
     }
     if (result.data.iaqi.containsKey("w")) {
-        sendEvent(name: "windSpeed", value: result.data.iaqi.w.v, displayed: true)
+    	if (units == "Imperial") {
+        	sendEvent(name: "windSpeed", value: Math.round((result.data.iaqi.w.v * 0.62137) * 10) / 10, unit: "mph", displayed: true)
+		} else {        
+            sendEvent(name: "windSpeed", value: result.data.iaqi.w.v, unit: "Km/h", displayed: true)
+        }
         } else {
-    sendEvent(name: "windSpeed", value: "n/a", displayed: true)
+    sendEvent(name: "windSpeed", value: "0", unit: "n/a", displayed: true)
     }
    } else {
-   
-   sendEvent(name: "airQuality", value: "error", displayed: true)
-   sendEvent(name: "temperature", value: "error", displayed: true)
-   sendEvent(name: "humidity", value: "error", displayed: true)
-   sendEvent(name: "fineDustLevel", value: "error", displayed: true)
-   sendEvent(name: "carbonMonoxideLevel", value: "error", displayed: true)
-   sendEvent(name: "dustLevel", value: "error", displayed: true)
+   sendEvent(name: "DeviceWatch-DeviceStatus", value: "offline")
+
+   sendEvent(name:"aqiState", value: "error", displayed: false)
+   sendEvent(name: "aqiLevel", value: "0", unit: " ", displayed: true)
+   sendEvent(name: "temperature", value: "0", unit: " ", displayed: true)
+   sendEvent(name: "humidity", value: "0", unit: " ", displayed: true)
+   sendEvent(name: "pmpAqiLevel", value: "0", unit: " ", displayed: true)
+   sendEvent(name: "coAqiLevel", value: "0", unit: " ", displayed: true)
+   sendEvent(name: "pmgAqiLevel", value: "0", unit: " ", displayed: true)
    sendEvent(name: "station", value: "error", displayed: true)
    sendEvent(name: "update", value: "error", displayed: true)
-   sendEvent(name: "ozoneLevel", value: "error", displayed: true)
-   sendEvent(name: "sulfurDioxideLevel", value: "error", displayed: true)
-   sendEvent(name: "nitrogenDioxideLevel", value: "error", displayed: true)
-   sendEvent(name: "atmPressureLevel", value: "error", displayed: true)
-   sendEvent(name: "windSpeed", value: "error", displayed: true)
+   sendEvent(name: "ozoneLevel", value: "0", unit: " ", displayed: true)
+   sendEvent(name: "sulfurDioxideLevel", value: "0", unit: " ", displayed: true)
+   sendEvent(name: "nitrogenDioxideLevel", value: "0", unit: " ", displayed: true)
+   sendEvent(name: "atmPressureLevel", value: "0", unit: " ", displayed: true)
+   sendEvent(name: "windSpeed", value: "0", unit: " ", displayed: true)
    }
 	} catch (e) {
     log.error "Exception caught while parsing data: "+e;
